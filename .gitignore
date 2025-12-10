@@ -48,3 +48,7 @@
 *.7z
 *.bz2
 *.xz
+
+# Ignore images and descriptors
+images
+descriptors
