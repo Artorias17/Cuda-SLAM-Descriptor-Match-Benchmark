@@ -1,50 +1,191 @@
+import argparse
 import cv2
 import numpy as np
+from pathlib import Path
+from typing import Optional
+from tqdm import tqdm
 
-# Load images
-img1 = cv2.imread("images/img1.jpg", cv2.IMREAD_GRAYSCALE)
-img2 = cv2.imread("images/img2.jpg", cv2.IMREAD_GRAYSCALE)
 
-# Resize the images (optional)
-img1 = cv2.resize(img1, (1280, 720))
-img2 = cv2.resize(img2, (1280, 720))
+def load_and_resize_image(
+    image_path: str, target_size: tuple[int, int] = (1280, 720)
+) -> np.ndarray:
+    """Load an image in grayscale and resize it."""
+    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        raise FileNotFoundError(f"Image not found: {image_path}")
+    return cv2.resize(img, target_size)
 
-# ORB extractor (generate 2000 features max)
-orb = cv2.ORB_create(2000)
 
-kp1, des1 = orb.detectAndCompute(img1, None)
-kp2, des2 = orb.detectAndCompute(img2, None)
+def extract_orb_features(
+    img: np.ndarray, max_features: int = 2000
+) -> tuple[list, np.ndarray]:
+    """Extract ORB features from an image."""
+    orb = cv2.ORB_create(max_features)
+    keypoints, descriptors = orb.detectAndCompute(img, None)
+    if descriptors is None:
+        raise ValueError("No descriptors found in image")
+    return keypoints, descriptors
 
-print("Original des1:", des1.shape)
-print("Original des2:", des2.shape)
 
-# ---- MULTI-SIZE FEATURE BENCHMARK ----
-max_feats = 2000   # change this to 500, 1000, 1500, 2000
+def limit_descriptors(
+    descriptors_list: list[np.ndarray], max_feats: int
+) -> list[np.ndarray]:
+    """Limit all descriptor sets to the same maximum number of features."""
+    # Find minimum available features across all descriptor sets
+    min_available = min(des.shape[0] for des in descriptors_list)
+    max_feats = min(max_feats, min_available)
 
-# make sure we do not go out of bounds
-max_feats = min(max_feats, des1.shape[0], des2.shape[0])
+    return [des[:max_feats] for des in descriptors_list]
 
-des1 = des1[:max_feats]
-des2 = des2[:max_feats]
 
-print(f"Using {max_feats} features for benchmark.")
-print("des1 resized:", des1.shape)
-print("des2 resized:", des2.shape)
+def save_descriptors(
+    descriptors_list: list[np.ndarray],
+    image_numbers: list[int],
+    output_dir: str = "descriptors",
+):
+    """Save multiple descriptor sets in both .npy and .bin formats, along with metadata.
+    
+    Args:
+        descriptors_list: List of descriptor arrays
+        image_numbers: List of image numbers corresponding to each descriptor (e.g., [1, 2, 3])
+        output_dir: Output directory path
+    """
+    output_path = Path(output_dir)
+    output_path.mkdir(exist_ok=True)
 
-# Save as .npy
-np.save("descriptors/des1.npy", des1)
-np.save("descriptors/des2.npy", des2)
+    # Ensure uint8 type for all descriptors
+    descriptors_list = [des.astype(np.uint8) for des in descriptors_list]
 
-# Convert to uint8 (already is, but just in case)
-des1 = des1.astype(np.uint8)
-des2 = des2.astype(np.uint8)
+    # Get dimensions (all should have same dim, just different N)
+    descriptor_dim = descriptors_list[0].shape[1]
+    feature_counts = [des.shape[0] for des in descriptors_list]
 
-# Save to binary for CUDA/C++
-des1.tofile("descriptors/des1.bin")
-des2.tofile("descriptors/des2.bin")
+    # Save each descriptor set with matching image number
+    for img_num, des in tqdm(
+        zip(image_numbers, descriptors_list),
+        desc="Saving descriptors",
+        total=len(descriptors_list),
+        unit="file",
+    ):
+        np.save(output_path / f"des{img_num}.npy", des)
+        des.tofile(output_path / f"des{img_num}.bin")
 
-# Save meta info
-with open("descriptors/meta.txt", "w") as f:
-    f.write(f"{des1.shape[0]} {des2.shape[0]} {des1.shape[1]}\n")
+    # Save meta info: num_images, num_features (same for all), descriptor_dim
+    num_features = feature_counts[0]  # All have same count after limiting
+    with open(output_path / "meta.txt", "w") as f:
+        f.write(f"{len(descriptors_list)} {num_features} {descriptor_dim}\n")
 
-print("Saved descriptors and meta.txt successfully!")
+    return feature_counts, descriptor_dim
+
+
+def extract_from_images(
+    image_paths: list[Path],
+    max_features: int = 2000,
+    resize_to: Optional[tuple[int, int]] = (1280, 720),
+    output_dir: str = "descriptors",
+):
+    """Extract descriptors from multiple images."""
+
+    if len(image_paths) < 2:
+        raise ValueError("Need at least 2 images for descriptor extraction")
+
+    descriptors_list = []
+    image_numbers = []
+
+    # Load and extract features from each image
+    for img_path in tqdm(image_paths, desc="Processing images", unit="image"):
+        # Extract image number from filename (e.g., img3.jpg -> 3)
+        img_num = int(img_path.stem[3:])
+        image_numbers.append(img_num)
+        
+        # Load and optionally resize
+        if resize_to:
+            img = load_and_resize_image(str(img_path), resize_to)
+        else:
+            img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
+            if img is None:
+                raise FileNotFoundError(f"Image not found: {img_path}")
+
+        # Extract features
+        kp, des = extract_orb_features(img, max_features)
+        descriptors_list.append(des)
+
+    # Limit to consistent feature count across all images
+    print(f"\nLimiting all descriptors to max {max_features} features...")
+    descriptors_list = limit_descriptors(descriptors_list, max_features)
+
+    print(f"\nFinal feature count per image: {descriptors_list[0].shape[0]}")
+    for img_num, des in zip(image_numbers, descriptors_list):
+        print(f"  des{img_num}: {des.shape}")
+
+    # Save descriptors
+    feature_counts, dim = save_descriptors(descriptors_list, image_numbers, output_dir)
+    print(f"\nSaved {len(descriptors_list)} descriptor sets successfully!")
+    print(f"Meta: {len(descriptors_list)} images, dim={dim}, features={feature_counts}")
+
+    return descriptors_list
+
+
+def main(
+    max_features: int = 2000,
+    images_dir: str = "images",
+    output_dir: str = "descriptors",
+):
+    """Main extraction pipeline for sequential frames.
+    
+    Args:
+        max_features: Maximum number of ORB features to extract per image
+        images_dir: Directory containing input images
+        output_dir: Directory for output descriptors
+    """
+
+    # Generate sequential image paths: img1.jpg, img2.jpg, ...
+    image_paths = sorted(
+        Path(images_dir).glob("img*.jpg"), key=lambda x: int(x.stem[3:])
+    )
+
+    if not image_paths:
+        raise FileNotFoundError(f"No images found matching 'img*.jpg' in {images_dir}")
+
+    print(f"Found {len(image_paths)} images in {images_dir}")
+
+    resize_to = (1280, 720)  # Set to None to keep original size
+
+    # Extract descriptors
+    descriptors = extract_from_images(
+        image_paths=image_paths,
+        max_features=max_features,
+        resize_to=resize_to,
+        output_dir=output_dir,
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Extract ORB descriptors from sequential image frames"
+    )
+    parser.add_argument(
+        "--max-features",
+        type=int,
+        default=2000,
+        help="Maximum number of ORB features per image",
+    )
+    parser.add_argument(
+        "--images-dir",
+        type=str,
+        default="images",
+        help="Directory containing images (img1.jpg, img2.jpg, ...)",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="descriptors",
+        help="Output directory for descriptors",
+    )
+
+    args = parser.parse_args()
+    main(
+        max_features=args.max_features,
+        images_dir=args.images_dir,
+        output_dir=args.output_dir,
+    )
