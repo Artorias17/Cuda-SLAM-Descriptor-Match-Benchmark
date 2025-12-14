@@ -21,20 +21,36 @@ def load_meta_info(descriptor_dir: str = "descriptors") -> tuple[int, int, int]:
     return num_images, num_features, dim
 
 
-def load_all_descriptors(descriptor_dir: str = "descriptors") -> list[np.ndarray]:
-    """Load all descriptor sets from .npy files."""
-    num_images, num_features, dim = load_meta_info(descriptor_dir)
+def load_all_descriptors(descriptor_dir: str = "descriptors") -> tuple[list[np.ndarray], list[int]]:
+    """Load all descriptor sets from .npy files using glob pattern (matches image numbering).
+    
+    Returns:
+        descriptors: List of descriptor arrays
+        file_numbers: List of file numbers extracted from filenames (e.g., [1, 2, 5] from des1.npy, des2.npy, des5.npy)
+    """
     desc_path = Path(descriptor_dir)
-
+    
+    # Use glob to find all des*.npy files, sorted by numeric suffix (like images)
+    descriptor_files = sorted(
+        desc_path.glob("des*.npy"),
+        key=lambda p: int(p.stem[3:])  # Extract number from "des{N}.npy"
+    )
+    
+    if not descriptor_files:
+        raise FileNotFoundError(f"No descriptor files found in {descriptor_dir}")
+    
     descriptors = []
-    for i in tqdm(
-        range(1, num_images + 1), desc="Loading descriptors", unit="file"
-    ):
-        des = np.load(desc_path / f"des{i}.npy")
+    file_numbers = []
+    for desc_file in tqdm(descriptor_files, desc="Loading descriptors", unit="file"):
+        # Extract file number from filename
+        file_num = int(desc_file.stem[3:])
+        file_numbers.append(file_num)
+        
+        des = np.load(desc_file)
         des = des.astype(np.uint8)
         descriptors.append(des)
 
-    return descriptors
+    return descriptors, file_numbers
 
 
 def match_descriptors_cpu(
@@ -57,8 +73,12 @@ def match_descriptors_cpu(
     return matches, elapsed_ms
 
 
-def match_sequential_frames(descriptors: list[np.ndarray]) -> list[dict]:
+def match_sequential_frames(descriptors: list[np.ndarray], file_numbers: list[int]) -> list[dict]:
     """Match consecutive frames sequentially (ORB-SLAM style).
+    
+    Args:
+        descriptors: List of descriptor arrays
+        file_numbers: List of actual file numbers (e.g., [1, 2, 5])
     
     Returns list of results for each consecutive pair.
     """
@@ -71,8 +91,8 @@ def match_sequential_frames(descriptors: list[np.ndarray]) -> list[dict]:
     print(f"\nMatching {n-1} consecutive frame pairs...")
     
     for i in tqdm(range(n - 1), desc="Matching frames", unit="pair"):
-        frame_i = i + 1
-        frame_j = i + 2
+        frame_i = file_numbers[i]       # Use actual file number
+        frame_j = file_numbers[i + 1]   # Use actual file number
         
         matches, elapsed_ms = match_descriptors_cpu(descriptors[i], descriptors[i+1])
         
@@ -98,11 +118,11 @@ def main(descriptor_dir: str = "descriptors", pair_index: tuple[int, int] = None
 
     # Load all descriptors
     print("Loading descriptors...")
-    descriptors = load_all_descriptors(descriptor_dir)
+    descriptors, file_numbers = load_all_descriptors(descriptor_dir)
 
     print(f"Loaded {len(descriptors)} descriptor sets:")
-    for i, des in enumerate(descriptors, start=1):
-        print(f"  des{i}: {des.shape}")
+    for file_num, des in zip(file_numbers, descriptors):
+        print(f"  des{file_num}: {des.shape}")
 
     if pair_index:
         # Match specific pair
@@ -119,7 +139,7 @@ def main(descriptor_dir: str = "descriptors", pair_index: tuple[int, int] = None
         return matches, elapsed_ms
     else:
         # Match all consecutive frames
-        results = match_sequential_frames(descriptors)
+        results = match_sequential_frames(descriptors, file_numbers)
         
         # Summary
         print("=" * 50)
