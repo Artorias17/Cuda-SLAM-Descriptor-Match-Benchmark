@@ -53,3 +53,5 @@
 images
 descriptors
 cudaMatch
+.venv
+.vs
