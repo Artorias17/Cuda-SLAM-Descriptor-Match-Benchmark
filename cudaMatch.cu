@@ -28,10 +28,10 @@ void matchSequentialFrames(const std::vector<std::vector<uint8_t>>& descriptors,
         std::vector<int> bestIdx, bestDist;
         double elapsedMs;
         
-        // Match descriptors[i] with descriptors[i+1]
-        matchDescriptorsGPU(descriptors[i].data(), descriptors[i + 1].data(),
-                           numFeatures, dim,
-                           bestIdx, bestDist, elapsedMs);
+        // Match descriptors[i] with descriptors[i+1] using cross-check for fair CPU/GPU comparison
+        matchDescriptorsGPUCrossCheck(descriptors[i].data(), descriptors[i + 1].data(),
+                                      numFeatures, dim,
+                                      bestIdx, bestDist, elapsedMs);
         
         // Count valid matches (non-negative indices)
         int numMatches = 0;

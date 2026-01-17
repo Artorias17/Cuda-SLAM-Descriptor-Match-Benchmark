@@ -43,4 +43,11 @@ void matchDescriptorsGPU(const uint8_t* hDes1, const uint8_t* hDes2,
                          std::vector<int>& hBestDist,
                          double& elapsedMs);
 
+// Match two descriptor sets on GPU with cross-checking (bidirectional verification)
+void matchDescriptorsGPUCrossCheck(const uint8_t* hDes1, const uint8_t* hDes2,
+                                    int N, int dim,
+                                    std::vector<int>& hBestIdx,
+                                    std::vector<int>& hBestDist,
+                                    double& elapsedMs);
+
 #endif
