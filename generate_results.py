@@ -7,7 +7,7 @@ import subprocess
 import re
 
 # Feature counts to benchmark
-FEATURE_COUNTS = [1000, 5000, 10000, 50000]
+FEATURE_COUNTS = [50, 100, 500, 1000, 2000, 3000, 4000, 5000]
 
 def plot_summary(results: Dict):
     """Plot and save benchmark results using matplotlib."""
