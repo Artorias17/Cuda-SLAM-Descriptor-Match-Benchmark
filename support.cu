@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 #include <tuple>
-#include <chrono>
 #include <algorithm>
 #include <filesystem>
 #include <cuda_runtime.h>

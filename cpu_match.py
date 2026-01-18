@@ -107,13 +107,11 @@ def match_sequential_frames(descriptors: list[np.ndarray], file_numbers: list[in
     return results
 
 
-def main(descriptor_dir: str = "descriptors", pair_index: tuple[int, int] = None):
+def main(descriptor_dir: str = "descriptors"):
     """Main CPU matching benchmark for ORB-SLAM style sequential matching.
 
     Args:
         descriptor_dir: Directory containing descriptor files
-        pair_index: Optional tuple (i, j) to match specific des_i with des_j (1-indexed).
-                   If None, matches all consecutive frames sequentially.
     """
 
     # Load all descriptors
@@ -124,42 +122,25 @@ def main(descriptor_dir: str = "descriptors", pair_index: tuple[int, int] = None
     for file_num, des in zip(file_numbers, descriptors):
         print(f"  des{file_num}: {des.shape}")
 
-    if pair_index:
-        # Match specific pair
-        i, j = pair_index
-        if i < 1 or j < 1 or i > len(descriptors) or j > len(descriptors):
-            raise ValueError(f"Invalid pair index: ({i}, {j})")
-
-        print(f"\nMatching des{i} <-> des{j}...")
-        matches, elapsed_ms = match_descriptors_cpu(descriptors[i - 1], descriptors[j - 1])
-
-        print(f"Number of matches: {len(matches)}")
-        print(f"CPU matching time: {elapsed_ms:.3f} ms")
-
-        return matches, elapsed_ms
-    else:
-        # Match all consecutive frames
-        results = match_sequential_frames(descriptors, file_numbers)
-        
-        # Summary
-        print("=" * 50)
-        print("SEQUENTIAL MATCHING SUMMARY:")
-        total_time = sum(r['time_ms'] for r in results)
-        avg_matches = sum(r['matches'] for r in results) / len(results)
-        print(f"Total frames: {len(descriptors)}")
-        print(f"Total pairs matched: {len(results)}")
-        print(f"Total CPU time: {total_time:.3f} ms")
-        print(f"Average time per pair: {total_time / len(results):.3f} ms")
-        print(f"Average matches per pair: {avg_matches:.1f}")
-        
-        return results
+    # Match all consecutive frames
+    results = match_sequential_frames(descriptors, file_numbers)
+    
+    # Summary
+    print("=" * 50)
+    print("SEQUENTIAL MATCHING SUMMARY:")
+    total_time = sum(r['time_ms'] for r in results)
+    avg_matches = sum(r['matches'] for r in results) / len(results)
+    print(f"Total frames: {len(descriptors)}")
+    print(f"Total pairs matched: {len(results)}")
+    print(f"Total CPU time: {total_time:.3f} ms")
+    print(f"Average time per pair: {total_time / len(results):.3f} ms")
+    print(f"Average matches per pair: {avg_matches:.1f}")
+    
+    return results
 
 
 
 if __name__ == "__main__":
-    # Match all consecutive frames (des1↔des2, des2↔des3, ...)
+    # Match all consecutive frames (des0↔des1, des1↔des2, ...)
     main()
-    
-    # Or match a specific pair:
-    # main(pair_index=(1, 2))
 

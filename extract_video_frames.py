@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Extract frames from a video file at specified FPS and save as image sequence.
-Frames are saved as img1.jpg, img2.jpg, ... in the output directory.
+Frames are saved as img0.jpg, img1.jpg, ... in the output directory.
 """
 
 import argparse

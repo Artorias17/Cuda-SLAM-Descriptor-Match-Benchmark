@@ -2,19 +2,8 @@ import argparse
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import Optional
 from tqdm import tqdm
 import shutil
-
-
-def load_and_resize_image(
-    image_path: str, target_size: tuple[int, int] = (1280, 720)
-) -> np.ndarray:
-    """Load an image in grayscale and resize it."""
-    img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        raise FileNotFoundError(f"Image not found: {image_path}")
-    return cv2.resize(img, target_size)
 
 
 def extract_orb_features(
@@ -86,7 +75,6 @@ def save_descriptors(
 def extract_descriptors_from_images(
     image_paths: list[Path],
     max_features: int = 2000,
-    resize_to: Optional[tuple[int, int]] = None,
     output_dir: str = "descriptors",
 ):
     """Extract descriptors from multiple images."""
@@ -103,13 +91,10 @@ def extract_descriptors_from_images(
         img_num = int(img_path.stem[3:])
         image_numbers.append(img_num)
         
-        # Load and optionally resize
-        if resize_to:
-            img = load_and_resize_image(str(img_path), resize_to)
-        else:
-            img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
-            if img is None:
-                raise FileNotFoundError(f"Image not found: {img_path}")
+        # Load image
+        img = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
+        if img is None:
+            raise FileNotFoundError(f"Image not found: {img_path}")
 
         # Extract features
         kp, des = extract_orb_features(img, max_features)
@@ -134,8 +119,7 @@ def extract_descriptors_from_images(
 def main(
     max_features: int = 2000,
     images_dir: str = "images",
-    output_dir: str = "descriptors",
-    resize_to: tuple[int, int] = None
+    output_dir: str = "descriptors"
 ):
     """Main extraction pipeline for sequential frames.
     
@@ -143,7 +127,6 @@ def main(
         max_features: Maximum number of ORB features to extract per image
         images_dir: Directory containing input images
         output_dir: Directory for output descriptors
-        resize_to: Tuple of (width, height) for descriptors
     """
 
     # Generate sequential image paths: img1.jpg, img2.jpg, ...
@@ -160,7 +143,6 @@ def main(
     extract_descriptors_from_images(
         image_paths=image_paths,
         max_features=max_features,
-        resize_to=resize_to,
         output_dir=output_dir,
     )
 
@@ -182,13 +164,6 @@ if __name__ == "__main__":
         help="Directory containing images (img1.jpg, img2.jpg, ...)",
     )
     parser.add_argument(
-        "--resize",
-        nargs=2,
-        type=int,
-        default=None,
-        help="Resize descriptors to width and height",
-    )
-    parser.add_argument(
         "--output-dir",
         type=str,
         default="descriptors",
@@ -196,11 +171,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    resize_to = None if args.resize is None else (args.resize[0], args.resize[1])
     
     main(
         max_features=args.max_features,
         images_dir=args.images_dir,
-        output_dir=args.output_dir,
-        resize_to=resize_to
+        output_dir=args.output_dir
     )

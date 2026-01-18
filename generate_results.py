@@ -79,7 +79,6 @@ def benchmark_suite() -> Dict[int, Dict]:
         # Run GPU
         gpu_result = subprocess.run(
             ["./build/cudaMatch"],
-            cwd="/home/abhishek/projects/descriptor_benchmark_cuda",
             capture_output=True,
             text=True
         )
@@ -93,6 +92,7 @@ def benchmark_suite() -> Dict[int, Dict]:
             gpu_time = float(match.group(1))
             results["gpu"].append(gpu_time)
         
+        # Stop if images can't provide more features
         if num_features < max_features:
             break
     
