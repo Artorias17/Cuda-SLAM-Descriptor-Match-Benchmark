@@ -78,10 +78,10 @@ def save_descriptors(
     return feature_counts, descriptor_dim
 
 
-def extract_from_images(
+def extract_descriptors_from_images(
     image_paths: list[Path],
     max_features: int = 2000,
-    resize_to: Optional[tuple[int, int]] = (1280, 720),
+    resize_to: Optional[tuple[int, int]] = None,
     output_dir: str = "descriptors",
 ):
     """Extract descriptors from multiple images."""
@@ -130,6 +130,7 @@ def main(
     max_features: int = 2000,
     images_dir: str = "images",
     output_dir: str = "descriptors",
+    resize_to: tuple[int, int] = None
 ):
     """Main extraction pipeline for sequential frames.
     
@@ -137,6 +138,7 @@ def main(
         max_features: Maximum number of ORB features to extract per image
         images_dir: Directory containing input images
         output_dir: Directory for output descriptors
+        resize_to: Tuple of (width, height) for descriptors
     """
 
     # Generate sequential image paths: img1.jpg, img2.jpg, ...
@@ -149,10 +151,8 @@ def main(
 
     print(f"Found {len(image_paths)} images in {images_dir}")
 
-    resize_to = (1280, 720)  # Set to None to keep original size
-
     # Extract descriptors
-    descriptors = extract_from_images(
+    extract_descriptors_from_images(
         image_paths=image_paths,
         max_features=max_features,
         resize_to=resize_to,
@@ -177,6 +177,13 @@ if __name__ == "__main__":
         help="Directory containing images (img1.jpg, img2.jpg, ...)",
     )
     parser.add_argument(
+        "--resize",
+        nargs=2,
+        type=int,
+        default=None,
+        help="Resize descriptors to width and height",
+    )
+    parser.add_argument(
         "--output-dir",
         type=str,
         default="descriptors",
@@ -184,8 +191,11 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+    resize_to = None if args.resize is None else (args.resize[0], args.resize[1])
+    
     main(
         max_features=args.max_features,
         images_dir=args.images_dir,
         output_dir=args.output_dir,
+        resize_to=resize_to
     )

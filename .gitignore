@@ -49,9 +49,20 @@
 *.bz2
 *.xz
 
-# Ignore images and descriptors
+# Python specific files and folders
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.venv/
+
+# mages, videos and descriptors
 images
+videos
 descriptors
 cudaMatch
-.venv
 .vs
