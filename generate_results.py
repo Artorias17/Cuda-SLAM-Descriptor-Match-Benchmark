@@ -52,7 +52,8 @@ def benchmark_suite() -> Dict[int, Dict]:
         cpu_result = cpu_match_main()
         
         results["features"].append(num_features)
-        results["cpu"].append([r['time_ms'] for r in cpu_result])
+        cpu_times = [r['time_ms'] for r in cpu_result]
+        results["cpu"].append(sum(cpu_times))  # Total CPU time for all pairs
         
         print(f"\n{'='*60}")
         print(f"# Running GPU Test")

@@ -4,6 +4,7 @@ import numpy as np
 from pathlib import Path
 from typing import Optional
 from tqdm import tqdm
+import shutil
 
 
 def load_and_resize_image(
@@ -51,6 +52,10 @@ def save_descriptors(
         output_dir: Output directory path
     """
     output_path = Path(output_dir)
+    # Remove existing directory to clear old descriptors
+    if output_path.exists():
+        shutil.rmtree(output_path)
+        print(f"Cleared existing {output_dir} directory")
     output_path.mkdir(exist_ok=True)
 
     # Ensure uint8 type for all descriptors
