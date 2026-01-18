@@ -1,204 +1,102 @@
 # ORB Descriptor Matching Benchmark: CPU vs GPU
 
-A performance comparison framework for ORB (Oriented FAST and Rotated BRIEF) descriptor matching between CPU and GPU implementations. This project benchmarks sequential frame matching patterns commonly used in visual SLAM systems like ORB-SLAM.
-
-## Overview
-
-This benchmark compares:
-- **CPU**: OpenCV's BFMatcher with highly optimized SIMD instructions (SSE4.2, AVX2, POPCNT)
-- **GPU**: Custom CUDA kernel with parallel Hamming distance computation
-
-The benchmark uses sequential frame matching (frame 1↔2, 2↔3, etc.) to simulate real-world ORB-SLAM workflows.
-
-## Features
-
-- **Modular Architecture**: Clean separation between descriptor extraction, matching, and benchmarking
-- **Automatic File Discovery**: Uses glob patterns to automatically discover and process images/descriptors
-- **File Number Preservation**: Maintains consistent numbering between images and descriptors (e.g., `img5.jpg` → `des5.npy/bin`)
-- **Sequential Matching**: Matches consecutive frames only (ORB-SLAM pattern), not all pairwise combinations
-- **Dual Format Support**: Saves descriptors in both `.npy` (NumPy) and `.bin` (binary) formats
-- **Progress Tracking**: Uses `tqdm` for visual progress indication
-- **Cross-Checking**: GPU and CPU both perform bidirectional verification (A→B and B→A) for fair comparison
-- **Accurate GPU Timing**: Uses CUDA events for GPU-synchronized kernel timing, excluding CPU synchronization overhead
+Performance comparison of ORB descriptor matching on CPU (OpenCV with SIMD) vs GPU (CUDA kernel) for sequential frame matching patterns used in visual SLAM.
 
 ## Project Structure
 
 ```
-.
-├── extract_descriptors.py    # Extract ORB features from images
-├── cpu_baseline.py            # CPU matching benchmark (OpenCV BFMatcher)
-├── cudaMatch.cu               # Main CUDA application
-├── kernel.cu                  # CUDA kernel implementation
-├── support.cu                 # Support functions (loading, GPU matching)
-├── support.h                  # Header with declarations and structs
-├── Makefile                   # Build configuration
-├── images/                    # Input images (img*.jpg)
-└── descriptors/               # Generated descriptors (des*.npy, des*.bin, meta.txt)
+extract_video_frames.py       # Extract frames from video
+extract_descriptors.py        # Extract ORB features from images
+cpu_match.py                  # CPU matching (OpenCV BFMatcher)
+generate_results.py           # Benchmark suite with scalability testing
+cudaMatch.cu / kernel.cu      # CUDA implementation
+support.cu / support.h        # GPU support functions
+images/                       # Input images (img*.jpg)
+descriptors/                  # Output descriptors (des*.npy, des*.bin, meta.txt)
 ```
 
 ## Requirements
 
-### Python
-- Python 3.11+
-- OpenCV (`opencv-python>=4.12.0.88`)
-- tqdm (`tqdm>=4.67.1`)
-
-### CUDA
-- NVIDIA GPU with CUDA support
-- CUDA Toolkit (tested with CUDA 11+)
-- C++17 compiler (for `std::filesystem`)
+- Python 3.11+ with opencv-python, tqdm
+- NVIDIA GPU with CUDA Toolkit 11+ and nvcc compiler
+- C++17 compiler
 
 ## Installation
 
-### Python Setup
-
-Using `uv` (recommended):
-```bash
-uv sync
-```
-
-Or using pip:
+Install Python dependencies:
 ```bash
 pip install opencv-python tqdm
 ```
 
-### CUDA Setup
-
-Ensure CUDA toolkit is installed and `nvcc` is in your PATH:
+Verify CUDA setup:
 ```bash
 nvcc --version
 ```
 
-## Usage
+## Quick Start
 
-### 1. Extract Descriptors
-
-Extract ORB features from images in the `images/` directory:
-
+**1. Extract frames from video** (optional):
 ```bash
-python extract_descriptors.py
+python extract_video_frames.py video.mp4 --target-fps 30 [--start-time 10] [--end-time 60]
 ```
 
-**Options:**
-- `--max-features`: Maximum number of features per image (default: 2000)
-- `--images-dir`: Directory containing input images (default: "images")
-- `--output-dir`: Directory for output descriptors (default: "descriptors")
-
-**Example with custom settings:**
+**2. Extract descriptors**:
 ```bash
-python extract_descriptors.py --max-features 10000 --images-dir my_images
+python extract_descriptors.py [--max-features 2000]
 ```
 
-**Input:** Images named `img*.jpg` (e.g., `img1.jpg`, `img2.jpg`, `img5.jpg`)
-
-**Output:**
-- `descriptors/des{N}.npy` - NumPy format descriptors
-- `descriptors/des{N}.bin` - Binary format descriptors
-- `descriptors/meta.txt` - Metadata: `num_images num_features descriptor_dim`
-
-### 2. Run CPU Benchmark
-
+**3. Build and benchmark**:
 ```bash
-python cpu_baseline.py
-```
-
-**Features:**
-- Uses OpenCV's BFMatcher with `crossCheck=True` for mutual best matches
-- Optimized with SIMD instructions (POPCNT for Hamming distance)
-- Reports actual matched pairs (not just nearest neighbors)
-
-### 3. Run GPU Benchmark
-
-Build and run the CUDA implementation:
-
-```bash
-make clean
 make
-./cudaMatch
+python generate_results.py
 ```
 
-**Features:**
-- Custom CUDA kernel with parallel Hamming distance computation
-- One block per descriptor in the first frame
-- 256 threads per block scan the second frame in parallel
-- Shared memory reduction to find minimum distance
-- Reports kernel execution time only (excludes memory transfer)
+Outputs `summary.png` with CPU vs GPU performance across feature counts (50 to 5000 features).
 
-## How It Works
+## Details
 
-### Descriptor Extraction (`extract_descriptors.py`)
+### extract_video_frames.py
+- Extracts frames at target FPS (default 30)
+- Options: `--start-time`, `--end-time` (seconds), `--output-dir`
+- Works with game footage (needs texture/detail)
+- Outputs: `images/img0.jpg`, `img1.jpg`, etc.
 
-1. **Auto-discovers images** using `Path.glob("img*.jpg")` sorted by numeric suffix
-2. **Extracts ORB features** using `cv2.ORB_create(max_features)`
-3. **Limits descriptors** to minimum available across all images (ensures consistency)
-4. **Preserves image numbering**: `img3.jpg` → `des3.npy` and `des3.bin`
-5. **Saves metadata** in single-line format: `num_images num_features dim`
+### extract_descriptors.py
+- Extracts ORB features from image sequence
+- Default max 2000 features per image
+- Outputs: `descriptors/des{N}.npy`, `des{N}.bin`, `meta.txt`
 
-### CPU Matching (`cpu_baseline.py`)
+### generate_results.py
+- Tests feature counts: 50, 100, 500, 1K, 2K, 3K, 4K, 5K
+- Runs CPU (OpenCV) and GPU (CUDA) benchmarks
+- Generates performance plot
 
-1. **Loads descriptors** using glob pattern, sorted by file number
-2. **Matches consecutive frames** sequentially (i↔i+1)
-3. **Uses BFMatcher** with Hamming distance and cross-checking
-4. **Reports per-pair and summary statistics**
+## Implementation Details
 
-### GPU Matching (`cudaMatch.cu`, `kernel.cu`, `support.cu`)
+### CPU: OpenCV BFMatcher
+- Bidirectional cross-checking (A→B and B→A match)
+- SIMD optimized (SSE4.2, AVX2, POPCNT)
+- Sequential frame matching (i↔i+1)
 
-1. **Loads descriptors** from binary files using filesystem iteration
-2. **Allocates GPU memory** and copies descriptors (Host→Device)
-3. **Launches two matching kernels** (forward and backward matching for cross-checking)
-4. **Measures kernel execution time** using CUDA events (GPU-synchronized, excludes CPU overhead)
-5. **Cross-checks results on CPU**: Keeps only mutual matches where A→B and B→A both point to each other
-6. **CUDA Kernel** (`matchKernelHamming`):
-   - Each block processes one descriptor from frame 1
-   - 256 threads scan all descriptors in frame 2 with stride
-   - Computes Hamming distance using `__popc()` intrinsic
-   - Parallel reduction in shared memory to find best match
-7. **Copies results back** (Device→Host)
-8. **Reports per-pair and summary statistics**
+### GPU: CUDA Kernel  
+- Bidirectional cross-checking (forward + backward kernel launches)
+- One block per descriptor, 256 threads per block
+- Shared memory parallel reduction
+- CUDA events for GPU-synchronized timing (excludes CPU overhead)
 
-### Meta Format
+Both CPU and GPU use the same cross-checking logic for fair comparison. Expected agreement: 99%+.
 
-The `meta.txt` file contains a single line:
-```
-num_images num_features descriptor_dim
-```
+## Meta Format
 
-Example: `2 2000 32` means 2 image frames, 2000 features each, 32-byte descriptors.
+`descriptors/meta.txt` contains: `num_images num_features descriptor_dim`
 
-## Technical Details
+Example: `2 2000 32` means 2 frames, 2000 features each, 32-byte ORB descriptors.
 
-### CPU Optimizations (OpenCV)
-- **SIMD Instructions**: SSE4.2, AVX2, AVX512 vectorization
-- **POPCNT**: Hardware bit counting for Hamming distance
-- **Multi-threading**: pthread-based parallelism
-- **Cross-Check**: Mutual best match filtering (A→B and B→A)
+## Future Work
 
-### GPU Implementation
-- **Kernel Strategy**: One block per descriptor in frame 1
-- **Thread Count**: 256 threads per block
-- **Memory Pattern**: Coalesced global memory access
-- **Reduction**: Shared memory parallel reduction for min distance
-- **Bit Counting**: `__popc()` intrinsic for Hamming distance
-- **Grid Size**: N blocks (N = number of descriptors)
-
-## Key Differences: CPU vs GPU Output
-
-### Match Counts
-- **CPU**: OpenCV BFMatcher with `crossCheck=True` - returns mutual best matches (bidirectional verification)
-- **GPU**: Custom CUDA implementation with cross-checking - runs bidirectional matching and filters for mutual matches
-- **Expected Agreement**: 99%+ match count agreement between CPU and GPU implementations
-
-Both implementations now use the same cross-checking logic: a match is valid only if A→B and B→A both point to each other.
-
-### Timing Methodology
-- **CPU**: Python `time.perf_counter()` for matching computation (excludes I/O)
-- **GPU**: CUDA events for kernel execution timing (GPU-synchronized, excludes H2D/D2H transfers and kernel launch overhead)
-
-Both approaches measure pure computation time on their respective processors for fair comparison.
-
-## Future Enhancements
-
-- [x] Add cross-checking to GPU kernel for fair match count comparison (bidirectional verification implemented)
-- [ ] Benchmark with varying descriptor counts (1K, 5K, 10K, 50K)
-- [ ] Generate performance plots automatically
-- [ ] Support for other descriptor types (SIFT, SURF, AKAZE)
+- [x] Bidirectional cross-checking (GPU fairness)
+- [x] Variable feature count benchmarking (50-5K)
+- [x] Performance plotting
+- [x] Video frame extraction tool
+- [ ] Other descriptor types (SIFT, AKAZE)
+- [ ] Batch processing optimizations
