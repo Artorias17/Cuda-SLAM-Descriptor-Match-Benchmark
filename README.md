@@ -23,9 +23,10 @@ descriptors/                  # Output descriptors (des*.npy, des*.bin, meta.txt
 
 ## Installation
 
-Install Python dependencies:
+Install Python dependencies using uv:
 ```bash
-pip install opencv-python tqdm
+uv sync
+source .venv/bin/activate
 ```
 
 Verify CUDA setup:
@@ -40,18 +41,41 @@ nvcc --version
 python extract_video_frames.py video.mp4 --target-fps 30 [--start-time 10] [--end-time 60]
 ```
 
-**2. Extract descriptors**:
-```bash
-python extract_descriptors.py [--max-features 2000]
-```
-
-**3. Build and benchmark**:
+**2. Build and benchmark**:
 ```bash
 make
 python generate_results.py
 ```
 
 Outputs `summary.png` with CPU vs GPU performance across feature counts (50 to 5000 features).
+
+## Running Scripts Individually
+
+If you want to run scripts separately:
+
+**Extract frames from video:**
+```bash
+python extract_video_frames.py video.mp4 --target-fps 30 --start-time 10 --end-time 60 --output-dir images
+```
+Arguments: `--target-fps` (default 30), `--start-time` (seconds), `--end-time` (seconds), `--output-dir` (default "images")
+
+**Extract descriptors:**
+```bash
+python extract_descriptors.py --max-features 2000 --images-dir images --output-dir descriptors
+```
+Arguments: `--max-features` (default 2000), `--images-dir` (default "images"), `--output-dir` (default "descriptors")
+
+**Run CPU matching only:**
+```bash
+python cpu_match.py
+```
+Uses descriptors from `descriptors/` directory by default.
+
+**Run GPU matching only:**
+```bash
+./build/cudaMatch
+```
+Uses descriptors from `descriptors/` directory.
 
 ## Details
 
