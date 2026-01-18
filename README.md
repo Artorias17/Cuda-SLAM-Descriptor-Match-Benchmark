@@ -67,9 +67,11 @@ Outputs `summary.png` with CPU vs GPU performance across feature counts (50 to 5
 - Outputs: `descriptors/des{N}.npy`, `des{N}.bin`, `meta.txt`
 
 ### generate_results.py
-- Tests feature counts: 50, 100, 500, 1K, 2K, 3K, 4K, 5K
-- Runs CPU (OpenCV) and GPU (CUDA) benchmarks
-- Generates performance plot
+- Tests feature counts: 50, 100, 500, 1K, 2K, 3K, 4K, 5K (adaptive)
+- Automatically stops when images can't provide more features
+- Runs CPU (OpenCV) and GPU (CUDA) benchmarks for each count
+- Generates performance plot with absolute times and speedup curves
+- Outputs: `summary.png` with dual-axis visualization
 
 ## Implementation Details
 
