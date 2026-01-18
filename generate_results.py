@@ -10,17 +10,34 @@ import re
 FEATURE_COUNTS = [50, 100, 500, 1000, 2000, 3000, 4000, 5000]
 
 def plot_summary(results: Dict):
-    """Plot and save benchmark results using matplotlib."""
+    """Plot and save benchmark results with speedup analysis."""
     
-    plt.figure(figsize=(10, 6))
-    plt.plot(results["features"], results["cpu"], marker='o', linewidth=2, markersize=8, label='CPU Total Time (ms)')
-    plt.plot(results["features"], results["gpu"], marker='o', linewidth=2, markersize=8, label='GPU Total Time (ms)')
-    plt.xlabel('Number of Features', fontsize=12)
-    plt.ylabel('Time (seconds)', fontsize=12)
-    plt.title('Descriptor Matching Performance Benchmark', fontsize=14)
-    plt.legend(fontsize=10)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    
+    # Left axis: Absolute times
+    ax1.plot(results["features"], results["cpu"], marker='o', linewidth=2.5, markersize=8, label='CPU Time', color='#1f77b4')
+    ax1.plot(results["features"], results["gpu"], marker='s', linewidth=2.5, markersize=8, label='GPU Time', color='#ff7f0e')
+    ax1.set_xlabel('Number of Features', fontsize=12)
+    ax1.set_ylabel('Time (ms)', fontsize=12, color='black')
+    ax1.tick_params(axis='y', labelcolor='black')
+    ax1.grid(True, alpha=0.3)
+    
+    # Right axis: Speedup ratio
+    ax2 = ax1.twinx()
+    speedup = [cpu / gpu for cpu, gpu in zip(results["cpu"], results["gpu"])]
+    ax2.plot(results["features"], speedup, marker='^', linewidth=2.5, markersize=8, label='Speedup', color='#2ca02c', linestyle='--')
+    ax2.set_ylabel('GPU Speedup (CPU time / GPU time)', fontsize=12, color='#2ca02c')
+    ax2.tick_params(axis='y', labelcolor='#2ca02c')
+    ax2.axhline(y=1, color='red', linestyle=':', linewidth=1.5, alpha=0.6, label='No speedup (1x)')
+    
+    plt.title('Descriptor Matching: Performance & Speedup Analysis', fontsize=14, fontweight='bold')
+    
+    # Combined legend from both axes
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left', fontsize=10)
+    
+    fig.tight_layout()
     plt.savefig('summary.png', dpi=300)
     plt.close()
     print("Summary plot saved as summary.png")
